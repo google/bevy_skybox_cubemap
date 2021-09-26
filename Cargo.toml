@@ -1,0 +1,23 @@
+[package]
+name = "bevy_skybox_cubemap"
+version = "0.1.0"
+edition = "2018"
+authors = ["Zachary Stewart <zstewart@google.com>"]
+description = "Cubemap-based Skyboxes for Bevy Engine."
+homepage = "https://github.com/google/bevy_skybox_cubemap"
+repository = "https://github.com/google/bevy_skybox_cubemap"
+license = "Apache-2.0"
+keywords = ["bevy", "skybox", "gamedev", "graphics"]
+categories = ["game-engines", "graphics"]
+
+[badges]
+github = { repository = "google/bevy_skybox_cubemap" }
+maintenance = { status = "passively-maintained" }
+
+[dependencies.bevy]
+version = "0.5.0"
+default-features = false
+features = ["render", "dds"]
+
+[dev-dependencies]
+bevy = "0.5.0"
