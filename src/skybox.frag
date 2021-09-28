@@ -15,12 +15,12 @@
 #version 450
 layout(location = 0) in vec3 TexCoords;
 
-layout(set = 1, binding = 0) uniform SkyboxMaterial_color {
+layout(set = 2, binding = 0) uniform SkyboxMaterial_color {
     vec4 color;
 };
 #ifdef SKYBOXMATERIAL_TEXTURE
-layout(set = 1, binding = 1) uniform texture2DArray SkyboxMaterial_texture;
-layout(set = 1, binding = 2) uniform sampler SkyboxMaterial_texture_sampler;
+layout(set = 2, binding = 1) uniform texture2DArray SkyboxMaterial_texture;
+layout(set = 2, binding = 2) uniform sampler SkyboxMaterial_texture_sampler;
 #endif
 
 layout(location = 0) out vec4 o_Target;

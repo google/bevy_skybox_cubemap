@@ -14,6 +14,8 @@
 
 //! Provides cubemap-based skyboxes for Bevy.
 //!
+//!
+//!
 //! Note: This is not an officially supported Google product.
 
 use bevy::prelude::*;
@@ -123,7 +125,10 @@ impl Default for SkyboxMaterial {
     }
 }
 
-/// Resource that manages converting texture handles to skyboxes.
+/// Resource that manages converting texture handles to skyboxes. Helper manages converting
+/// stacked 2d images to skybox-appropriate array textures. Note that if your skybox texture is in a
+/// format that supports being loaded with layers, this is unnecessary, as you can just set each
+/// face of the skybox to a separate layer instead of arranging them vertically in one image.
 #[derive(Default)]
 pub struct SkyboxTextureConversion {
     /// List of texture handles that should be skyboxes.
@@ -131,21 +136,27 @@ pub struct SkyboxTextureConversion {
 }
 
 impl SkyboxTextureConversion {
-    /// Convert the given handle
-    pub fn convert(&mut self, handle: Handle<Texture>) {
+    /// Takes a handle to a texture whose dimensions are N wide X 6*N high, waits for it to load,
+    /// and then reinterprets that texture as an array of 6 textures suitable or a skymap. This is
+    /// useful if your skymap is not in a format that has layers, and should only be run once per
+    /// texture.
+    pub fn make_array(&mut self, handle: Handle<Texture>) {
         self.handles.push(handle);
     }
 }
 
-/// Convert skybox textures to actual cubemaps.
+/// System to handle reinterpreting an Nx6N vertical texture stack as an array of textures suitable
+/// for a skybox.
 fn convert_skyboxes(
     mut conversions: ResMut<SkyboxTextureConversion>,
     mut textures: ResMut<Assets<Texture>>,
 ) {
     let mut i = 0;
     loop {
+        // Check each texture in the pending queue to see if it is loaded yet.
         let (handle, texture) = match conversions.handles.get(i) {
             Some(handle) => match textures.get_mut(handle) {
+                // If it's loaded, take it out of the queue.
                 Some(texture) => (conversions.handles.remove(i), texture),
                 None => {
                     i += 1;
@@ -155,8 +166,8 @@ fn convert_skyboxes(
             None => break,
         };
 
-        info!(
-            "Skybox Texture {:?}: format: {:?}, len: {}, extents: {:?}",
+        debug!(
+            "Reinterpreting as Skybox Texture {:?}: format: {:?}, len: {}, extents: {:?}",
             handle,
             texture.format,
             texture.data.len(),

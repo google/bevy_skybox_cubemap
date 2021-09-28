@@ -21,6 +21,9 @@ layout(set = 0, binding = 0) uniform CameraViewProj {
 layout(set = 0, binding = 1) uniform CameraView {
     mat4 View;
 };
+layout(set = 1, binding = 0) uniform Transform {
+    mat4 Model;
+};
 
 layout(location = 0) out vec3 TexCoords;
 
@@ -35,7 +38,12 @@ void main() {
 
     mat4 untranslatedProj = ViewProj * View * inverse(untranslatedView);
 
-    vec4 pos = untranslatedProj * vec4(Vertex_Position, 1.0);
+    // We allow rotating the skybox, but not translating (since we need the position to match the
+    // zeroed camera position). To do that, remove the translation from the model matrix.
+    mat4 untranslatedModel = Model;
+    untranslatedModel[3] = vec4(0.0, 0.0, 0.0, 1.0);
+
+    vec4 pos = untranslatedProj * untranslatedModel * vec4(Vertex_Position, 1.0);
     // Use w as z to force the point as far back a possible for depth testing purposes. This makes
     // sure it never draws in front of anything else.
     gl_Position = pos.xyww;

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::f32::consts::PI;
+
 use bevy::prelude::*;
 use bevy::render::camera::{Camera, PerspectiveProjection};
 use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
@@ -59,7 +61,7 @@ fn setup(
     let skybox_texture = asset_server.load("labeled_skybox.png");
     // Skybox textures are stacked 2d images and need to be converted to a 2d texture array before
     // they can be sampled.
-    skybox_conversion.convert(skybox_texture.clone());
+    skybox_conversion.make_array(skybox_texture.clone());
 
     // plane
     commands.spawn_bundle(PbrBundle {
