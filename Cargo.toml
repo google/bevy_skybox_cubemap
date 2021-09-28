@@ -11,7 +11,7 @@ keywords = ["bevy", "skybox", "gamedev", "graphics"]
 categories = ["game-engines", "graphics"]
 
 [badges]
-github = { repository = "google/bevy_skybox_cubemap" }
+github = { repository = "google/bevy_skybox_cubemap", workflow = "Rust" }
 maintenance = { status = "passively-maintained" }
 
 [dependencies.bevy]
