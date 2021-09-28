@@ -6,4 +6,6 @@
 
 Provides cubemap-based skyboxes for Bevy.
 
+Note: This is not an officially supported Google product.
+
 License: Apache-2.0

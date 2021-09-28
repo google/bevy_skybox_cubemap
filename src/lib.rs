@@ -13,6 +13,8 @@
 // limitations under the License.
 
 //! Provides cubemap-based skyboxes for Bevy.
+//!
+//! Note: This is not an officially supported Google product.
 
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
