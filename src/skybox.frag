@@ -42,7 +42,7 @@ vec3 sampleCubeHacky(const vec3 ray) {
     } else if (rayAbs.y >= rayAbs.x) {
         faceIndex = ray.y < 0.0 ? 3.0 : 2.0;
         maxAdjust = 0.5 / ray.y;
-        uv = vec2(ray.x, ray.z * -sign(ray.y)) * sign(ray.y);
+        uv = vec2(ray.x * sign(ray.y), -ray.z);
     } else {
         faceIndex = ray.x < 0.0 ? 1.0 : 0.0;
         maxAdjust = 0.5 / ray.x;
