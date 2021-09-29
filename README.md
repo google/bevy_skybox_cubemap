@@ -17,8 +17,6 @@ the scene.
 ## Basic usage
 
 ```rust
-#use bevy::prelude::*;
-#use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
 // Install the skybox plugin:
 App::build()
     .add_plugins(DefaultPlugins)

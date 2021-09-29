@@ -24,8 +24,8 @@
 //! # Basic usage
 //!
 //! ```
-//! #use bevy::prelude::*;
-//! #use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
+//! # use bevy::prelude::*;
+//! # use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
 //! // Install the skybox plugin:
 //! App::build()
 //!     .add_plugins(DefaultPlugins)
@@ -191,26 +191,26 @@ impl Plugin for SkyboxPlugin {
 /// from its default orientation).
 ///
 /// ```
-/// #use bevy::prelude::*;
-/// #use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
-/// #App::build()
-/// #    .add_plugins(DefaultPlugins)
-/// #    .add_plugin(SkyboxPlugin)
-/// #    .add_startup_system(setup.system());
-/// #fn setup(
-/// #    mut commands: Commands,
-/// #    asset_server: Res<AssetServer>,
-/// #    mut meshes: ResMut<Assets<Mesh>>,
-/// #    mut materials: ResMut<Assets<StandardMaterial>>,
-/// #    mut skyboxes: ResMut<Assets<SkyboxMaterial>>,
-/// #    mut skybox_conversion: ResMut<SkyboxTextureConversion>,
-/// #) {
-/// #let skybox_texture = asset_server.load("labeled_skybox.png");
-/// #skybox_conversion.make_array(skybox_texture.clone());
+/// # use bevy::prelude::*;
+/// # use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
+/// # App::build()
+/// #     .add_plugins(DefaultPlugins)
+/// #     .add_plugin(SkyboxPlugin)
+/// #     .add_startup_system(setup.system());
+/// # fn setup(
+/// #     mut commands: Commands,
+/// #     asset_server: Res<AssetServer>,
+/// #     mut meshes: ResMut<Assets<Mesh>>,
+/// #     mut materials: ResMut<Assets<StandardMaterial>>,
+/// #     mut skyboxes: ResMut<Assets<SkyboxMaterial>>,
+/// #     mut skybox_conversion: ResMut<SkyboxTextureConversion>,
+/// # ) {
+/// # let skybox_texture = asset_server.load("labeled_skybox.png");
+/// # skybox_conversion.make_array(skybox_texture.clone());
 /// commands.spawn_bundle(SkyboxBundle::new(
 ///     skyboxes.add(SkyboxMaterial::from_texture(skybox_texture)),
 /// ));
-/// #}
+/// # }
 /// ```
 #[derive(Bundle)]
 pub struct SkyboxBundle {
