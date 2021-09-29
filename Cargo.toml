@@ -9,6 +9,11 @@ repository = "https://github.com/google/bevy_skybox_cubemap"
 license = "Apache-2.0"
 keywords = ["bevy", "skybox", "gamedev", "graphics"]
 categories = ["game-engines", "graphics"]
+exclude = [
+    "docimgs/",
+    "*.xcf",
+    ".github/",
+]
 
 [badges]
 github = { repository = "google/bevy_skybox_cubemap", workflow = "Rust" }
