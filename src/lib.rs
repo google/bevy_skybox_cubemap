@@ -73,15 +73,15 @@
 //! Skybox. A helper is provided to convert a single-layer `N x 6N` image into a 6 layer image
 //! appropriate for a skybox.
 //!
+//! This is the net of the cube that the orientation of the faces is based on. It is *not* the
+//! texture layout that is actually used for rendering.
+//!
 //! <img src="https://raw.githubusercontent.com/google/bevy_skybox_cubemap/main/docimgs/expected_net.png" />
 //!
 //! |           | Top (+Y)    |            |           |
 //! |-----------|-------------|------------|-----------|
 //! | Left (-X) | Front (-Z)  | Right (+X) | Back (+Z) |
 //! |           | Bottom (-Y) |            |           |
-//!
-//! This is the net of the cube that the orientation of the faces is based on. It is *not* the
-//! texture layout that is actually used for rendering.
 //!
 //! For rendering, the faces are used as separate layers of an array texture in this order:
 //!
@@ -97,6 +97,8 @@
 //! the image, send it to [`SkyboxTextureConversion`], which will use
 //! [`Texture::reinterpret_stacked_2d_as_array`] to convert it to a 6 layer array once it is loaded.
 //!
+//! Here is the above net rearranged into the correct order for a skybox texture:
+//!
 //! <img src="https://raw.githubusercontent.com/google/bevy_skybox_cubemap/main/docimgs/array_format.png" />
 //!
 //! When converting from a net or a collection of images representing the faces of the skybox, pay
@@ -105,7 +107,12 @@
 //! whatever face matches the top and bottom as the "front" when rearranging the faces into the
 //! vertical array format.
 //!
+//! For example, if the top and bottom branch off of the third square instead of the second, you
+//! could interpret the net this way:
+//!
 //! <img src="https://raw.githubusercontent.com/google/bevy_skybox_cubemap/main/docimgs/shifted_net.png" />
+//!
+//! You would then rearrange from this net to the same vertical layout as above.
 //!
 //! Alternately, if want a specific face to be used as the "front" and that face isn't the one that
 //! matches the orientation of the top and bottom, you could instead rotate the top and bottom when
