@@ -23,7 +23,7 @@
 //!
 //! # Basic usage
 //!
-//! ```
+//! ```no_run
 //! # use bevy::prelude::*;
 //! # use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
 //! // Install the skybox plugin:
@@ -197,12 +197,10 @@ impl Plugin for SkyboxPlugin {
 /// property except the `material` and occasionally `transform` (if you want to rotate the skybox
 /// from its default orientation).
 ///
-/// ```
+/// ```no_run
 /// # use bevy::prelude::*;
 /// # use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
 /// # App::build()
-/// #     .add_plugins(DefaultPlugins)
-/// #     .add_plugin(SkyboxPlugin)
 /// #     .add_startup_system(setup.system());
 /// # fn setup(
 /// #     mut commands: Commands,
