@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::f32::consts::PI;
-
 use bevy::prelude::*;
 use bevy::render::camera::{Camera, PerspectiveProjection};
 use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
@@ -113,11 +111,7 @@ fn setup(
         ..Default::default()
     });
     // skybox
-    commands.spawn_bundle(SkyboxBundle {
-        material: skyboxes.add(SkyboxMaterial {
-            texture: Some(skybox_texture),
-            ..Default::default()
-        }),
-        ..Default::default()
-    });
+    commands.spawn_bundle(SkyboxBundle::new(
+        skyboxes.add(SkyboxMaterial::from_texture(skybox_texture)),
+    ));
 }

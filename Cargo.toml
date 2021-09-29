@@ -17,7 +17,7 @@ maintenance = { status = "passively-maintained" }
 [dependencies.bevy]
 version = "0.5.0"
 default-features = false
-features = ["render", "dds"]
+features = ["render"]
 
 [dev-dependencies]
 bevy = "0.5.0"

@@ -14,9 +14,130 @@
 
 //! Provides cubemap-based skyboxes for Bevy.
 //!
+//! # Overview
 //!
+//! This crate provides a material type, [`SkyboxMaterial`], and bundle, [`SkyboxBundle`], which
+//! make it easy to add a skybox to a scene. Skyboxes are implemented as normal entities using a
+//! special shader to ensure they always appear around the camera and behind all other objects in
+//! the scene.
 //!
-//! Note: This is not an officially supported Google product.
+//! # Basic usage
+//!
+//! ```
+//! #use bevy::prelude::*;
+//! #use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
+//! // Install the skybox plugin:
+//! App::build()
+//!     .add_plugins(DefaultPlugins)
+//!     .add_plugin(SkyboxPlugin)
+//!     .add_startup_system(setup.system());
+//!
+//! // Configure the skybox.
+//! fn setup(
+//!    mut commands: Commands,
+//!    asset_server: Res<AssetServer>,
+//!    mut skyboxes: ResMut<Assets<SkyboxMaterial>>,
+//!    mut skybox_conversion: ResMut<SkyboxTextureConversion>,
+//! ) {
+//!     // Load a texture to use as the skybox.
+//!     let skybox_texture = asset_server.load("labeled_skybox.png");
+//!     // Convert a flat image the 6 faces above one another into a 6-layer array texture that's
+//!     // appropriate for skybox use.
+//!     skybox_conversion.make_array(skybox_texture.clone());
+//!     // Spawn a skybox entity.
+//!     commands.spawn_bundle(SkyboxBundle::new(
+//!         skyboxes.add(SkyboxMaterial::from_texture(skybox_texture)),
+//!     ));
+//! }
+//! ```
+//!
+//! See below for details on the required texture format.
+//!
+//! Skyboxes are more or less normal entities. Normal Bevy features like render layers and render
+//! pass selection should work on them, so it should be possible to have different skyboxes in
+//! different cameras using render layers.
+//!
+//! The skybox is implemented almost entirely in shader code, so aside from the initial texture
+//! conversion (which you can do yourself if you prefer), there's no need for additional cameras or
+//! marker components or complicated transform setup on the camera or skybox. The shader will ensure
+//! that the skybox is always drawn behind all other entities and that the position of both the
+//! camera and skybox have no effect.
+//!
+//! In case you want your skybox to have a different orientation, the rotation compoenent of the skybox's
+//! transform *is* respected.
+//!
+//! # Texture Layout
+//!
+//! In order to use a Skybox, you need a properly formatted Skybox texture. Appropriate textures for
+//! `SkyboxMaterial` should have 6 identically sized square layers which make up the 6 faces of the
+//! Skybox. A helper is provided to convert a single-layer `N x 6N` image into a 6 layer image
+//! appropriate for a skybox.
+//!
+//! <img src="https://raw.githubusercontent.com/google/bevy_skybox_cubemap/main/docimgs/expected_net.png" />
+//!
+//! |           | Top (+Y)    |            |           |
+//! |-----------|-------------|------------|-----------|
+//! | Left (-X) | Front (-Z)  | Right (+X) | Back (+Z) |
+//! |           | Bottom (-Y) |            |           |
+//!
+//! This is the net of the cube that the orientation of the faces is based on. It is *not* the
+//! texture layout that is actually used for rendering.
+//!
+//! For rendering, the faces are used as separate layers of an array texture in this order:
+//!
+//! * Right (+X)
+//! * Left (-X)
+//! * Top (+Y)
+//! * Bottom (-Y)
+//! * Back (+Z)
+//! * Front (-Z)
+//!
+//! Currently the easiest way to create an image with the appropriate layers is to rearrange the
+//! sections of the cube net into a single vertical image in the required order, then when you load
+//! the image, send it to [`SkyboxTextureConversion`], which will use
+//! [`Texture::reinterpret_stacked_2d_as_array`] to convert it to a 6 layer array once it is loaded.
+//!
+//! <img src="https://raw.githubusercontent.com/google/bevy_skybox_cubemap/main/docimgs/array_format.png" />
+//!
+//! When converting from a net or a collection of images representing the faces of the skybox, pay
+//! attention to their orientation relative to the canonical net above. If you have a net with a
+//! differnt face connected to the top and bottom, the easiest thing to do is to simply interpret
+//! whatever face matches the top and bottom as the "front" when rearranging the faces into the
+//! vertical array format.
+//!
+//! <img src="https://raw.githubusercontent.com/google/bevy_skybox_cubemap/main/docimgs/shifted_net.png" />
+//!
+//! Alternately, if want a specific face to be used as the "front" and that face isn't the one that
+//! matches the orientation of the top and bottom, you could instead rotate the top and bottom when
+//! building the stacked array texture. However, since you can also rotate the skybox using the
+//! skybox entity's transform, that's probably not necessary.
+//!
+//! # Maintenance of this Crate
+//!
+//! Bevy is a cool project and I am excited for it to succeed. However, I don't necessarily have
+//! time to always keep this crate up to date with the latest versions of Bevy, especially if it
+//! gets relatively low usage.
+//!
+//! That said, I *will* respond to pull requests and will release new versions based on pull
+//! requests to update to newer versions of Bevy. Creating a pull request is preferable to opening
+//! an issue asking me to update, because I can more easily spare the time to merge a pull request
+//! than to do all the necessary updates myself, but if I do get issues asking me to update to new
+//! versions of Bevy, I will respond to them on a best-effort basis.
+//!
+//! I will create releases targeting the latest published version of Bevy, not `main`. If you are
+//! working on main, and need to modify this crate to work with the latest `HEAD`, I recommend
+//! forking and then sending me a pull request once Bevy publishes an updated version.
+//!
+//! In terms of features, I would consider this project largely feature-complete as-is. Texture
+//! packaging seems to be outside the scope of features supported by Bevy, so I'm not going to add
+//! tools to automate building textures for skyboxes. This crate also isn't intended to support any
+//! kind of dynamic skyboxes, so there doesn't seem to be much more that needs to be done besides
+//! keeping up with latest versions of Bevy. However, if you have any ideas for new features or API
+//! changes, I'm happy to hear them.
+//!
+//! # Disclaimer
+//!
+//! This is not an officially supported Google product.
 
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
@@ -31,7 +152,7 @@ use bevy::render::renderer::RenderResources;
 use bevy::render::shader::{asset_shader_defs_system, ShaderDefs, ShaderStage, ShaderStages};
 use bevy::render::texture::TextureFormat;
 
-/// Configures the skybox render pipeline and support for [`SkyboxMaterial`].
+/// Configures the skybox render pipeline and support for [`SkyboxMaterial`]. Also sets up the system for [`
 pub struct SkyboxPlugin;
 
 impl Plugin for SkyboxPlugin {
@@ -62,23 +183,70 @@ impl Plugin for SkyboxPlugin {
 }
 
 /// Bundle for spawning Skybox entities. Note that you should be able to use defaults for everything
-/// besides `material`.
+/// besides `material`. The only other field you may want to touch is `transform` which can be used
+/// to rotate the skybox if desired. Translations applied to skyboxes are ignored.
+///
+/// When inserting a skybox bundle, you should generally use `..Default::default()` for every
+/// property except the `material` and occasionally `transform` (if you want to rotate the skybox
+/// from its default orientation).
+///
+/// ```
+/// #use bevy::prelude::*;
+/// #use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
+/// #App::build()
+/// #    .add_plugins(DefaultPlugins)
+/// #    .add_plugin(SkyboxPlugin)
+/// #    .add_startup_system(setup.system());
+/// #fn setup(
+/// #    mut commands: Commands,
+/// #    asset_server: Res<AssetServer>,
+/// #    mut meshes: ResMut<Assets<Mesh>>,
+/// #    mut materials: ResMut<Assets<StandardMaterial>>,
+/// #    mut skyboxes: ResMut<Assets<SkyboxMaterial>>,
+/// #    mut skybox_conversion: ResMut<SkyboxTextureConversion>,
+/// #) {
+/// #let skybox_texture = asset_server.load("labeled_skybox.png");
+/// #skybox_conversion.make_array(skybox_texture.clone());
+/// commands.spawn_bundle(SkyboxBundle::new(
+///     skyboxes.add(SkyboxMaterial::from_texture(skybox_texture)),
+/// ));
+/// #}
+/// ```
 #[derive(Bundle)]
 pub struct SkyboxBundle {
     /// Material to use for the skybox. Defaults to a garish pink. In most usage this should be the
     /// only field you need to set.
     pub material: Handle<SkyboxMaterial>,
-    /// Mesh to use for the skybox. Defaults to [`SKYBOX_MESH_HANDLE`], which is a unit cube.
+    /// Mesh to use for the skybox. Defaults to [`SKYBOX_MESH_HANDLE`], which is a unit cube. You
+    /// shouldn't ever need to use any other mesh. Because of how cubemap sampling works, probably
+    /// any mesh that completely surrounds the camera would work equally well, but only the unit
+    /// cube is officially supported by this crate.
     pub mesh: Handle<Mesh>,
+    /// Marker to draw the skybox in the main pass.
     pub main_pass: MainPass,
+    /// This is included in every type that can be drawn. Honestly not sure what it does.
     pub draw: Draw,
+    /// This is included in every type that can be drawn. Can be used to hide the skybox.
     pub visible: Visible,
     /// Needs to be configured to use the skybox render pipeline.
     pub render_pipelines: RenderPipelines,
-    /// Transform is largely irrelevant for a skybox, but still required by rendering.
+    /// Transform can be used to manipulate the rotation of the skybox.
     pub transform: Transform,
-    /// Transform is largely irrelevant for a skybox, but still required by rendering.
+    /// Transforms get computed into global transforms used for drawing based on parenting. Note
+    /// that it doesn't make much sense to add a skybox as a child of any other entity; it should
+    /// usually be freestanding.
     pub global_transform: GlobalTransform,
+}
+
+impl SkyboxBundle {
+    /// Convenience constructor for [`SkyboxBundle`]. Sets the material and uses defaults for
+    /// everything else. In most use cases you should only need to set the material.
+    pub fn new(material: Handle<SkyboxMaterial>) -> Self {
+        Self {
+            material,
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for SkyboxBundle {
@@ -98,7 +266,21 @@ impl Default for SkyboxBundle {
     }
 }
 
-/// Material for a Skybox.
+/// Material for a Skybox. Consists of a base color and an optional 6-sided array-texture.
+///
+/// When rendering, the color from the texure is multiplied by the base color. This can be used to
+/// tint the skybox. When creating a new material, the default color is [`Color::WHITE`] which will
+/// have no effect on the texture color.
+///
+/// It is also possible to use a skybox texture with only a [`Color`]. One reason you might want to
+/// do this is that (at time of writing) Bevy does not seem to antialias against the window
+/// [`ClearColor`] properly, instead antialiasing with white for objects that have not other 3d
+/// object behind them. This leads to white borders around antialiased object that overlap the
+/// window clear color. To avoid this, you could spawn a skybox using only a color. Since the skybox
+/// is a 3d rendered object, antialiasing against it works properly.
+///
+/// Skyboxes should generally be spawned using [`SkyboxBundle`], and you can see that type for info
+/// on what components are used with this material.
 #[derive(RenderResources, Debug, ShaderDefs, TypeUuid)]
 // UUID5 generated by first creating a URL-namespaced UUID5 for
 // "https://github.com/google/bevy_skybox_cubemap" (24291f52-ea01-574a-b6ae-3d8182f6086b) then using
@@ -106,15 +288,37 @@ impl Default for SkyboxBundle {
 #[uuid = "fca7708e-57bb-5a81-977f-95b0e5202de0"]
 pub struct SkyboxMaterial {
     /// Base color of the skybox. Multiplied with the color from the texture if a texture is
-    /// supplied. Note that if you are using `SkyboxMaterial` without a texture, you should consider
-    /// just setting the window clear color.
+    /// supplied, otherwise used by itself as the skybox color.
     pub color: Color,
-    /// Texture to use for the skybox. This must be a cubemap texture.
+    /// Texture to use for the skybox. This must be a an aray texture with 6 layers which are all
+    /// square and the same size. See [the crate overview](crate) for details on the required layer
+    /// order and how to get a texture in this format.
     #[shader_def]
     pub texture: Option<Handle<Texture>>,
 }
 
+impl SkyboxMaterial {
+    /// Creates a `SkyboxMaterial` with just a texture. The color will be set to [`Color::WHITE`] to
+    /// avoid tinting the texture.
+    pub fn from_texture(texture: Handle<Texture>) -> Self {
+        Self {
+            texture: Some(texture),
+            ..Default::default()
+        }
+    }
+
+    /// Creates a `SkyboxMaterial` with only a color. This could be used in place of [`ClearColor`]
+    /// if `ClearColor` is giving you issues with antialiasing. Otherwise it's not all that useful.
+    pub fn from_color(color: Color) -> Self {
+        Self {
+            color,
+            ..Default::default()
+        }
+    }
+}
+
 impl Default for SkyboxMaterial {
+    /// Creates a new skybox material with color set to white and no texture.
     fn default() -> Self {
         Self {
             // Set the default color to white, so when using with a texture the color doesn't impact
@@ -125,10 +329,14 @@ impl Default for SkyboxMaterial {
     }
 }
 
-/// Resource that manages converting texture handles to skyboxes. Helper manages converting
-/// stacked 2d images to skybox-appropriate array textures. Note that if your skybox texture is in a
-/// format that supports being loaded with layers, this is unnecessary, as you can just set each
-/// face of the skybox to a separate layer instead of arranging them vertically in one image.
+/// Resource to help with converting skyboxes stored as vertically stacked images as described in
+/// the [crate] documentation into array textures in the correct format for use in a
+/// [`SkyboxMaterial`].
+///
+/// The [`SkyboxPlugin`] will add this resource and install an associated system which handles the
+/// actual texture conversion. Conversion is performed using
+/// [`Texture::reinterpret_stacked_2d_as_array`]. If you prefer, you are free to handle converting
+/// textures yourself, or use a texture format + loader which can load array textures directly.
 #[derive(Default)]
 pub struct SkyboxTextureConversion {
     /// List of texture handles that should be skyboxes.
@@ -136,10 +344,10 @@ pub struct SkyboxTextureConversion {
 }
 
 impl SkyboxTextureConversion {
-    /// Takes a handle to a texture whose dimensions are N wide X 6*N high, waits for it to load,
-    /// and then reinterprets that texture as an array of 6 textures suitable or a skymap. This is
-    /// useful if your skymap is not in a format that has layers, and should only be run once per
-    /// texture.
+    /// Takes a handle to a texture whose dimensions are `N` wide by `6*N` high, waits for it to load,
+    /// and then reinterprets that texture as an array of 6 textures suitable or a skybox. This is
+    /// useful if your skybox texture is not in a format that has layers. This should only be done
+    /// once per testure, and will panic if the texture has already be reinterpreted.
     pub fn make_array(&mut self, handle: Handle<Texture>) {
         self.handles.push(handle);
     }
@@ -177,7 +385,7 @@ fn convert_skyboxes(
     }
 }
 
-/// Constants defining node names.
+/// Constants defining node names in the render graph.
 pub mod node {
     /// Node for the `SkyboxMaterial`.
     pub const SKYBOX_MATERIAL: &str = "skybox_material";
