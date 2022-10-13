@@ -146,37 +146,47 @@
 //!
 //! This is not an officially supported Google product.
 
+use bevy::asset::load_internal_asset;
+use bevy::pbr::{MaterialPipeline, MaterialPipelineKey};
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
-use bevy::render::pipeline::{
-    BlendFactor, BlendOperation, BlendState, ColorTargetState, ColorWrite, CompareFunction,
-    CullMode, DepthBiasState, DepthStencilState, FrontFace, PipelineDescriptor, PolygonMode,
-    PrimitiveState, PrimitiveTopology, RenderPipeline, StencilFaceState, StencilState,
+use bevy::render::mesh::{Mesh, MeshVertexBufferLayout};
+use bevy::render::render_resource::{
+    AsBindGroup, RenderPipelineDescriptor, ShaderRef, ShaderStage, SpecializedMeshPipelineError, TextureViewDimension,
 };
-use bevy::render::render_graph::base::MainPass;
-use bevy::render::render_graph::{base, AssetRenderResourcesNode, RenderGraph};
-use bevy::render::renderer::RenderResources;
-use bevy::render::shader::{asset_shader_defs_system, ShaderDefs, ShaderStage, ShaderStages};
-use bevy::render::texture::TextureFormat;
 
 /// Configures the skybox render pipeline and support for [`SkyboxMaterial`]. Also sets up the system for [`
 pub struct SkyboxPlugin;
 
 impl Plugin for SkyboxPlugin {
-    fn build(&self, app: &mut AppBuilder) {
-        app.add_asset::<SkyboxMaterial>()
-            .add_system_to_stage(
-                CoreStage::PostUpdate,
-                asset_shader_defs_system::<SkyboxMaterial>.system(),
-            )
+    fn build(&self, app: &mut App) {
+        load_internal_asset!(
+            app,
+            SKYBOX_VERT_HANDLE,
+            "skybox.vert",
+            |source: &'static str| { Shader::from_glsl(source, ShaderStage::Vertex) }
+        );
+        load_internal_asset!(
+            app,
+            SKYBOX_FRAG_HANDLE,
+            "skybox.frag",
+            |source: &'static str| { Shader::from_glsl(source, ShaderStage::Fragment) }
+        );
+
+        app.add_plugin(MaterialPlugin::<SkyboxMaterial>::default())
             .init_resource::<SkyboxTextureConversion>()
-            .add_system(convert_skyboxes.system());
-        add_skybox_graph(app.world_mut());
-        add_skybox_mesh(&mut *app.world_mut().get_resource_mut().unwrap());
+            .add_system(convert_skyboxes);
+        // app.add_asset::<SkyboxMaterial>()
+        //     .add_system_to_stage(
+        //         CoreStage::PostUpdate,
+        //         asset_shader_defs_system::<SkyboxMaterial>.system(),
+        //     )
+        // add_skybox_graph(app.world_mut());
+        add_skybox_mesh(&mut *app.world.get_resource_mut().unwrap());
 
         // add default SkyboxMaterial
         let mut materials = app
-            .world_mut()
+            .world
             .get_resource_mut::<Assets<SkyboxMaterial>>()
             .unwrap();
         materials.set_untracked(
@@ -227,14 +237,12 @@ pub struct SkyboxBundle {
     /// any mesh that completely surrounds the camera would work equally well, but only the unit
     /// cube is officially supported by this crate.
     pub mesh: Handle<Mesh>,
-    /// Marker to draw the skybox in the main pass.
-    pub main_pass: MainPass,
-    /// This is included in every type that can be drawn. Honestly not sure what it does.
-    pub draw: Draw,
     /// This is included in every type that can be drawn. Can be used to hide the skybox.
-    pub visible: Visible,
-    /// Needs to be configured to use the skybox render pipeline.
-    pub render_pipelines: RenderPipelines,
+    pub visibility: Visibility,
+    /// This is included in every type that can be drawn. Can be used to hide the skybox.
+    pub computed_visibility: ComputedVisibility,
+    // /// Needs to be configured to use the skybox render pipeline.
+    // pub render_pipelines: RenderPipelines,
     /// Transform can be used to manipulate the rotation of the skybox.
     pub transform: Transform,
     /// Transforms get computed into global transforms used for drawing based on parenting. Note
@@ -259,12 +267,11 @@ impl Default for SkyboxBundle {
         Self {
             material: Default::default(),
             mesh: SKYBOX_MESH_HANDLE.typed(),
-            main_pass: Default::default(),
-            draw: Default::default(),
-            visible: Default::default(),
-            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                SKYBOX_PIPELINE_HANDLE.typed(),
-            )]),
+            visibility: Default::default(),
+            computed_visibility: Default::default(),
+            // render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+            //     SKYBOX_PIPELINE_HANDLE.typed(),
+            // )]),
             transform: Default::default(),
             global_transform: Default::default(),
         }
@@ -286,7 +293,7 @@ impl Default for SkyboxBundle {
 ///
 /// Skyboxes should generally be spawned using [`SkyboxBundle`], and you can see that type for info
 /// on what components are used with this material.
-#[derive(RenderResources, Debug, ShaderDefs, TypeUuid)]
+#[derive(AsBindGroup, Debug, Clone, TypeUuid)]
 // UUID5 generated by first creating a URL-namespaced UUID5 for
 // "https://github.com/google/bevy_skybox_cubemap" (24291f52-ea01-574a-b6ae-3d8182f6086b) then using
 // that as the namespace with `bevy_skybox_cubemap::SkyboxMaterial` as the name.
@@ -294,20 +301,22 @@ impl Default for SkyboxBundle {
 pub struct SkyboxMaterial {
     /// Base color of the skybox. Multiplied with the color from the texture if a texture is
     /// supplied, otherwise used by itself as the skybox color.
+    #[uniform(0)]
     pub color: Color,
-    /// Texture to use for the skybox. This must be a an aray texture with 6 layers which are all
-    /// square and the same size. See [the crate overview](crate) for details on the required layer
-    /// order and how to get a texture in this format.
-    #[shader_def]
-    pub texture: Option<Handle<Texture>>,
+    // /// Texture to use for the skybox. This must be a an aray texture with 6 layers which are all
+    // /// square and the same size. See [the crate overview](crate) for details on the required layer
+    // /// order and how to get a texture in this format.
+    // #[texture(1, dimension = "cube")]
+    // #[sampler(2)]
+    // pub texture: Option<Handle<Image>>,
 }
 
 impl SkyboxMaterial {
     /// Creates a `SkyboxMaterial` with just a texture. The color will be set to [`Color::WHITE`] to
     /// avoid tinting the texture.
-    pub fn from_texture(texture: Handle<Texture>) -> Self {
+    pub fn from_texture(texture: Handle<Image>) -> Self {
         Self {
-            texture: Some(texture),
+            // texture: Some(texture),
             ..Default::default()
         }
     }
@@ -329,8 +338,35 @@ impl Default for SkyboxMaterial {
             // Set the default color to white, so when using with a texture the color doesn't impact
             // the texture color.
             color: Color::WHITE,
-            texture: None,
+            // texture: None,
         }
+    }
+}
+
+impl Material for SkyboxMaterial {
+    fn fragment_shader() -> ShaderRef {
+        SKYBOX_FRAG_HANDLE.typed().into()
+    }
+
+    fn vertex_shader() -> ShaderRef {
+        SKYBOX_VERT_HANDLE.typed().into()
+    }
+
+    fn specialize(
+        _pipeline: &MaterialPipeline<Self>,
+        descriptor: &mut RenderPipelineDescriptor,
+        _layout: &MeshVertexBufferLayout,
+        key: MaterialPipelineKey<Self>,
+    ) -> Result<(), SpecializedMeshPipelineError> {
+        // if key.bind_group_data.has_texture {
+        //     let fragment = descriptor.fragment.as_mut().unwrap();
+        //     fragment
+        //         .shader_defs
+        //         .push("SKYBOXMATERIAL_TEXTURE".to_string());
+        // }
+        descriptor.vertex.entry_point = "main".into();
+        descriptor.fragment.as_mut().unwrap().entry_point = "main".into();
+        Ok(())
     }
 }
 
@@ -345,7 +381,7 @@ impl Default for SkyboxMaterial {
 #[derive(Default)]
 pub struct SkyboxTextureConversion {
     /// List of texture handles that should be skyboxes.
-    handles: Vec<Handle<Texture>>,
+    handles: Vec<Handle<Image>>,
 }
 
 impl SkyboxTextureConversion {
@@ -353,7 +389,7 @@ impl SkyboxTextureConversion {
     /// and then reinterprets that texture as an array of 6 textures suitable or a skybox. This is
     /// useful if your skybox texture is not in a format that has layers. This should only be done
     /// once per testure, and will panic if the texture has already be reinterpreted.
-    pub fn make_array(&mut self, handle: Handle<Texture>) {
+    pub fn make_array(&mut self, handle: Handle<Image>) {
         self.handles.push(handle);
     }
 }
@@ -362,7 +398,7 @@ impl SkyboxTextureConversion {
 /// for a skybox.
 fn convert_skyboxes(
     mut conversions: ResMut<SkyboxTextureConversion>,
-    mut textures: ResMut<Assets<Texture>>,
+    mut textures: ResMut<Assets<Image>>,
 ) {
     let mut i = 0;
     loop {
@@ -379,46 +415,44 @@ fn convert_skyboxes(
             None => break,
         };
 
-        debug!(
-            "Reinterpreting as Skybox Texture {:?}: format: {:?}, len: {}, extents: {:?}",
-            handle,
-            texture.format,
-            texture.data.len(),
-            texture.size
-        );
+        debug!("Reinterpreting as Skybox Texture {:?}", handle,);
         texture.reinterpret_stacked_2d_as_array(6);
+        texture.texture_view_descriptor.get_or_insert_with(default).dimension = Some(TextureViewDimension::Cube);
     }
 }
 
-/// Constants defining node names in the render graph.
-pub mod node {
-    /// Node for the `SkyboxMaterial`.
-    pub const SKYBOX_MATERIAL: &str = "skybox_material";
-}
+// /// Constants defining node names in the render graph.
+// pub mod node {
+//     /// Node for the `SkyboxMaterial`.
+//     pub const SKYBOX_MATERIAL: &str = "skybox_material";
+// }
+//
+// /// Add the render graph and pipeline for the skybox to the world.
+// fn add_skybox_graph(world: &mut World) {
+//     {
+//         let mut graph = world.get_resource_mut::<RenderGraph>().unwrap();
+//         graph.add_system_node(
+//             node::SKYBOX_MATERIAL,
+//             AssetRenderResourcesNode::<SkyboxMaterial>::new(true),
+//         );
+//         graph
+//             .add_node_edge(node::SKYBOX_MATERIAL, base::node::MAIN_PASS)
+//             .unwrap();
+//     }
+//
+//     let pipeline = build_skybox_pipeline(&mut world.get_resource_mut::<Assets<Shader>>().unwrap());
+//     let mut pipelines = world
+//         .get_resource_mut::<Assets<PipelineDescriptor>>()
+//         .unwrap();
+//     pipelines.set_untracked(SKYBOX_PIPELINE_HANDLE, pipeline);
+// }
 
-/// Add the render graph and pipeline for the skybox to the world.
-fn add_skybox_graph(world: &mut World) {
-    {
-        let mut graph = world.get_resource_mut::<RenderGraph>().unwrap();
-        graph.add_system_node(
-            node::SKYBOX_MATERIAL,
-            AssetRenderResourcesNode::<SkyboxMaterial>::new(true),
-        );
-        graph
-            .add_node_edge(node::SKYBOX_MATERIAL, base::node::MAIN_PASS)
-            .unwrap();
-    }
-
-    let pipeline = build_skybox_pipeline(&mut world.get_resource_mut::<Assets<Shader>>().unwrap());
-    let mut pipelines = world
-        .get_resource_mut::<Assets<PipelineDescriptor>>()
-        .unwrap();
-    pipelines.set_untracked(SKYBOX_PIPELINE_HANDLE, pipeline);
-}
-
-/// Handle to use to reference the skybox pipeline.
-pub const SKYBOX_PIPELINE_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(PipelineDescriptor::TYPE_UUID, 16037920303847147810);
+/// Handle to use to reference the skybox vertex shader.
+pub const SKYBOX_VERT_HANDLE: HandleUntyped =
+    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 16037920303847147810);
+/// Handle to use to reference the skybox fragment shader.
+pub const SKYBOX_FRAG_HANDLE: HandleUntyped =
+    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 8266127799467747040);
 
 fn add_skybox_mesh(meshes: &mut Assets<Mesh>) {
     // Skybox mesh needs to be large enough not to get caught in the camera's near-clip plane (but
@@ -430,58 +464,58 @@ fn add_skybox_mesh(meshes: &mut Assets<Mesh>) {
 pub const SKYBOX_MESH_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Mesh::TYPE_UUID, 7423141153313829192);
 
-/// Build the render pipeline for the skybox vertex and fragment shaders.
-fn build_skybox_pipeline(shaders: &mut Assets<Shader>) -> PipelineDescriptor {
-    PipelineDescriptor {
-        depth_stencil: Some(DepthStencilState {
-            format: TextureFormat::Depth32Float,
-            depth_write_enabled: true,
-            // Depth test needs to use LessEqual because it is forcing all points of the skybox to
-            // maximum depth.
-            depth_compare: CompareFunction::LessEqual,
-            stencil: StencilState {
-                front: StencilFaceState::IGNORE,
-                back: StencilFaceState::IGNORE,
-                read_mask: 0,
-                write_mask: 0,
-            },
-            bias: DepthBiasState {
-                constant: 0,
-                slope_scale: 0.0,
-                clamp: 0.0,
-            },
-            clamp_depth: false,
-        }),
-        color_target_states: vec![ColorTargetState {
-            format: TextureFormat::default(),
-            color_blend: BlendState {
-                src_factor: BlendFactor::SrcAlpha,
-                dst_factor: BlendFactor::OneMinusSrcAlpha,
-                operation: BlendOperation::Add,
-            },
-            alpha_blend: BlendState {
-                src_factor: BlendFactor::One,
-                dst_factor: BlendFactor::One,
-                operation: BlendOperation::Add,
-            },
-            write_mask: ColorWrite::ALL,
-        }],
-        primitive: PrimitiveState {
-            topology: PrimitiveTopology::TriangleList,
-            strip_index_format: None,
-            front_face: FrontFace::Ccw,
-            cull_mode: CullMode::Front,
-            polygon_mode: PolygonMode::Fill,
-        },
-        ..PipelineDescriptor::new(ShaderStages {
-            vertex: shaders.add(Shader::from_glsl(
-                ShaderStage::Vertex,
-                include_str!("skybox.vert"),
-            )),
-            fragment: Some(shaders.add(Shader::from_glsl(
-                ShaderStage::Fragment,
-                include_str!("skybox.frag"),
-            ))),
-        })
-    }
-}
+// /// Build the render pipeline for the skybox vertex and fragment shaders.
+// fn build_skybox_pipeline(shaders: &mut Assets<Shader>) -> PipelineDescriptor {
+//     PipelineDescriptor {
+//         depth_stencil: Some(DepthStencilState {
+//             format: TextureFormat::Depth32Float,
+//             depth_write_enabled: true,
+//             // Depth test needs to use LessEqual because it is forcing all points of the skybox to
+//             // maximum depth.
+//             depth_compare: CompareFunction::LessEqual,
+//             stencil: StencilState {
+//                 front: StencilFaceState::IGNORE,
+//                 back: StencilFaceState::IGNORE,
+//                 read_mask: 0,
+//                 write_mask: 0,
+//             },
+//             bias: DepthBiasState {
+//                 constant: 0,
+//                 slope_scale: 0.0,
+//                 clamp: 0.0,
+//             },
+//             clamp_depth: false,
+//         }),
+//         color_target_states: vec![ColorTargetState {
+//             format: TextureFormat::default(),
+//             color_blend: BlendState {
+//                 src_factor: BlendFactor::SrcAlpha,
+//                 dst_factor: BlendFactor::OneMinusSrcAlpha,
+//                 operation: BlendOperation::Add,
+//             },
+//             alpha_blend: BlendState {
+//                 src_factor: BlendFactor::One,
+//                 dst_factor: BlendFactor::One,
+//                 operation: BlendOperation::Add,
+//             },
+//             write_mask: ColorWrite::ALL,
+//         }],
+//         primitive: PrimitiveState {
+//             topology: PrimitiveTopology::TriangleList,
+//             strip_index_format: None,
+//             front_face: FrontFace::Ccw,
+//             cull_mode: CullMode::Front,
+//             polygon_mode: PolygonMode::Fill,
+//         },
+//         ..PipelineDescriptor::new(ShaderStages {
+//             vertex: shaders.add(Shader::from_glsl(
+//                 ShaderStage::Vertex,
+//                 include_str!("skybox.vert"),
+//             )),
+//             fragment: Some(shaders.add(Shader::from_glsl(
+//                 ShaderStage::Fragment,
+//                 include_str!("skybox.frag"),
+//             ))),
+//         })
+//     }
+// }

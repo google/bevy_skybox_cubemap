@@ -17,13 +17,13 @@ use bevy::render::camera::{Camera, PerspectiveProjection};
 use bevy_skybox_cubemap::{SkyboxBundle, SkyboxMaterial, SkyboxPlugin, SkyboxTextureConversion};
 
 fn main() {
-    App::build()
+    App::new()
         .insert_resource(ClearColor(Color::PINK))
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
         .add_plugin(SkyboxPlugin)
-        .add_startup_system(setup.system())
-        .add_system(spin_camera.system())
+        .add_startup_system(setup)
+        .add_system(spin_camera)
         .run();
 }
 
@@ -101,17 +101,17 @@ fn setup(
         ..Default::default()
     });
     // light
-    commands.spawn_bundle(LightBundle {
+    commands.spawn_bundle(PointLightBundle {
         transform: Transform::from_xyz(4.0, 8.0, 4.0),
         ..Default::default()
     });
     // camera
-    commands.spawn_bundle(PerspectiveCameraBundle {
+    commands.spawn_bundle(Camera3dBundle {
         transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..Default::default()
     });
     // skybox
-    commands.spawn_bundle(SkyboxBundle::new(
-        skyboxes.add(SkyboxMaterial::from_texture(skybox_texture)),
+    commands.spawn_bundle(SkyboxBundle::default(
+        //skyboxes.add(SkyboxMaterial::from_texture(skybox_texture)),
     ));
 }
