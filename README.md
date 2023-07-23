@@ -3,7 +3,9 @@
 [![Workflow Status](https://github.com/google/bevy_skybox_cubemap/workflows/Rust/badge.svg)](https://github.com/google/bevy_skybox_cubemap/actions?query=workflow%3A%22Rust%22)
 ![Maintenance](https://img.shields.io/badge/maintenance-passively--maintained-yellowgreen.svg)
 
-# Bevy Skybox Cubemap
+# **\[DEPRECATED\]** Bevy Skybox Cubemap
+
+Bevy 0.11 provides native support for this and this crate has not been updated since Bevy 0.5 and will not work with any more recent version of Bevy.
 
 Provides cubemap-based skyboxes for Bevy.
 
